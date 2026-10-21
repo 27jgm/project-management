@@ -14,7 +14,7 @@ export const DEFAULT_PREFS = {
   weekStart: 1,
   dateFmt: 'MMM d',
   lang: 'English (US)',
-  tz: '(GMT-07:00) Pacific Time',
+  tz: '(GMT-03:00) Buenos Aires',
   motion: 'system',
   home: 'home',
   openTasks: 'drawer',
