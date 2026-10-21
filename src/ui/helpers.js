@@ -69,7 +69,13 @@ export function fmtComment(txt) {
   D().members.forEach(m => {
     h = h.split('@' + esc(m.name)).join(`<span class="mention">@${esc(m.name)}</span>`);
   });
-  return h;
+  // Light Markdown on top of the escaped text, so MCP-written comments read well.
+  return h
+    .replace(/`([^`\n]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>')
+    .replace(/(^|[^*])\*([^*\s][^*\n]*)\*/g, '$1<i>$2</i>')
+    .replace(/\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+    .replace(/\n/g, '<br>');
 }
 export const FT = {
   fig: { c: '#8662C9', i: 'pen-tool', n: 'Figma' },

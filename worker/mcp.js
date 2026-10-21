@@ -215,7 +215,7 @@ const TOOLS = [
       const t = await findTask(db, a.issue);
       const comments = (await db.prepare('SELECT data FROM comments WHERE task = ? ORDER BY at').bind(t.id).all()).results.map(r => {
         const c = JSON.parse(r.data);
-        return { id: c.id, at: new Date(c.at).toISOString(), text: htmlToMd(c.text) };
+        return { id: c.id, at: new Date(c.at).toISOString(), text: c.text };
       });
       return { ...issueView(t, true), comments };
     },
@@ -285,7 +285,7 @@ const TOOLS = [
       const t = await findTask(db, a.issue);
       return (await db.prepare('SELECT data FROM comments WHERE task = ? ORDER BY at').bind(t.id).all()).results.map(r => {
         const c = JSON.parse(r.data);
-        return { id: c.id, at: new Date(c.at).toISOString(), text: htmlToMd(c.text) };
+        return { id: c.id, at: new Date(c.at).toISOString(), text: c.text };
       });
     },
   },
@@ -303,8 +303,8 @@ const TOOLS = [
       if (a.id) {
         const row = await db.prepare('SELECT data FROM comments WHERE id = ? AND task = ?').bind(a.id, t.id).first();
         if (!row) fail(`Comment not found: ${a.id}`);
-        c = { ...JSON.parse(row.data), text: mdToHtml(a.body) };
-      } else c = { id: uid('c'), task: t.id, by: await me(db), at: Date.now(), text: mdToHtml(a.body), re: {} };
+        c = { ...JSON.parse(row.data), text: a.body };
+      } else c = { id: uid('c'), task: t.id, by: await me(db), at: Date.now(), text: a.body, re: {} };
       const stmts = [upsertStmt(db, 'comments', c)];
       if (!a.id) stmts.push(upsertStmt(db, 'activity', activity(c.by, 'commented on', t, t.project)));
       await db.batch(stmts);
