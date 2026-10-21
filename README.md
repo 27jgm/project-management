@@ -77,6 +77,40 @@ Dependencies point downward:
 Every push and pull request runs lint, the format check and a production build
 (`.github/workflows/ci.yml`).
 
-## Deploy
+## Deploy (Cloudflare Worker + D1, behind Access)
 
-`vercel.json` builds with Vite and serves `dist/`.
+One Worker serves the built app (`dist/`), the sync API (`/api/*`) and the MCP server (`/mcp`) on
+your own host. Data lives in D1; `migrations/` holds the schema.
+
+1. `npx wrangler login`
+2. `cp wrangler.example.jsonc wrangler.jsonc` (gitignored: it holds your host, database id and Access values, none of which belong in the repo).
+3. `npx wrangler d1 create do`, then put the printed `database_id` in `wrangler.jsonc` along with your host.
+4. In Zero Trust, add a **self-hosted application** for your host with two policies:
+   _Allow_ your email (browser login) and _Service Auth_ (MCP clients). Copy its **AUD tag** and your
+   team domain (`<team>.cloudflareaccess.com`) into `vars` in `wrangler.jsonc`.
+5. Create a service token (Zero Trust > Access > Service auth) and keep the id and secret.
+6. `npm run db:migrate && npm run deploy`
+
+The Worker re-verifies the Access JWT on every request, and `workers.dev` / preview URLs are
+disabled, so the only way in is through Access.
+
+### Local development
+
+```bash
+cp .dev.vars.example .dev.vars   # DEV_BYPASS_ACCESS=1 skips Access locally only
+npm run db:migrate:local
+npm run worker:dev               # http://localhost:8787 (build + Worker + local D1)
+```
+
+## MCP (replaces Linear / Jira in every project)
+
+Register once at user scope, so it is available in all projects:
+
+```bash
+claude mcp add --transport http --scope user do https://<your-host>/mcp \
+  --header "CF-Access-Client-Id: <id>.access" --header "CF-Access-Client-Secret: <secret>"
+```
+
+Tools: `list_projects`, `get_project`, `save_project`, `list_issues`, `get_issue`, `save_issue`,
+`list_comments`, `save_comment`, `delete_comment`, `list_issue_statuses`, `list_issue_labels`.
+Issues are addressed by key (`WEB-204`); descriptions and comments are Markdown.

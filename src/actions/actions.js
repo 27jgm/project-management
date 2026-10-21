@@ -3,8 +3,7 @@
    ===================================================================== */
 import { $, $$, TODAY, addD, dOff, esc, fmtDate, iso, parse, uid } from '../core/utils.js';
 import { PR, PSTAT, ST } from '../core/constants.js';
-import { seed } from '../data/seed.js';
-import { D, DEFAULT_PREFS, S, allTasks, canSee, commentsOf, logAct, me, mem, proj, save, task, tasksOf, visibleProjects } from '../core/store.js';
+import { D, S, allTasks, canSee, commentsOf, logAct, me, mem, proj, save, task, tasksOf, visibleProjects } from '../core/store.js';
 import { fileType, fsize } from '../ui/helpers.js';
 import { effectiveDark } from '../core/theme.js';
 import { mutate, toast } from '../ui/toast.js';
@@ -1781,31 +1780,13 @@ A.toggleOffline = () => {
 };
 A.retryOnline = el => {
   el.classList.add('is-loading');
+  save();
   setTimeout(() => {
-    S.ui.offline = false;
     render();
-    toast('Reconnected. All changes are synced.');
-  }, 700);
+    if (!S.ui.offline) toast('Reconnected. All changes are synced.');
+  }, 1200);
 };
-A.resetDemo = () => {
-  S.ui.pop = null;
-  confirmDlg({
-    title: 'Reset demo data?',
-    body: 'All projects, tasks, and settings in this browser go back to the original sample workspace.',
-    ok: 'Reset data',
-    danger: true,
-    icon: 'rotate-ccw',
-    run: () => {
-      S.data = seed();
-      S.views = {};
-      S.prefs = { ...DEFAULT_PREFS, theme: S.prefs.theme };
-      S.ui.drawer = null;
-      save();
-      go('home');
-      toast('Demo data restored');
-    },
-  });
-};
+A.resetDemo = () => toast('Resetting is disabled: this workspace is stored in D1.', { kind: 'info' });
 A.toastInfo = el => toast(el.dataset.msg, { kind: 'info' });
 A.demoToast = el => {
   const v = el.dataset.v;
@@ -1912,22 +1893,7 @@ A.saveWorkspace = () => {
       toast('Workspace settings saved');
   });
 };
-A.delWorkspace = () =>
-  confirmDlg({
-    title: `Delete ${D().ws.name}?`,
-    body: 'Every project, task, file, and comment in this workspace will be permanently deleted for all members.',
-    ok: 'Delete workspace',
-    danger: true,
-    typeName: D().ws.name,
-    run: () => {
-      S.data = seed();
-      S.views = {};
-      save();
-      S.ui.auth = 'login';
-      render();
-      toast('Workspace deleted. Demo data was restored for this prototype.', { kind: 'info', ms: 5000 });
-    },
-  });
+A.delWorkspace = () => toast('Deleting the workspace is disabled: it is stored in D1.', { kind: 'info' });
 A.avColor = el => {
   me().c = el.dataset.v;
   save();

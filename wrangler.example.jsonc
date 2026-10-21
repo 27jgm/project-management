@@ -1,0 +1,30 @@
+// Template. Copy to wrangler.jsonc (gitignored) and fill in your own values; see README.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "do",
+  "main": "worker/index.js",
+  "compatibility_date": "2026-10-01",
+  // The only way in is the custom domain below, which sits behind Cloudflare Access.
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [{ "pattern": "YOUR_HOST.example.com", "custom_domain": true }],
+  "assets": {
+    "directory": "dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/mcp", "/mcp/*"],
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "do",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations",
+    },
+  ],
+  "vars": {
+    // Zero Trust > Settings > Custom pages shows the team name; the AUD tag is on the Access application.
+    "ACCESS_TEAM_DOMAIN": "YOUR_TEAM.cloudflareaccess.com",
+    "ACCESS_AUD": "ACCESS_APPLICATION_AUD_TAG",
+  },
+}

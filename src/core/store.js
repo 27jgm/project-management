@@ -1,9 +1,11 @@
 /* ---------- store ---------- */
 import { TODAY, diffD, iso, parse, uid } from './utils.js';
 import { PCOLORS, TEAMS_SEED } from './constants.js';
-import { seed } from '../data/seed.js';
 
-export const STORE_KEY = 'gr8r.v2';
+const COLLAPSED_KEY = 'do.sidebar-collapsed';
+/* Server-backed collections: synced one entity at a time. Every other key of S.data is a setting. */
+export const ENTITY_KINDS = ['members', 'projects', 'tasks', 'comments', 'activity', 'notifs', 'files', 'events', 'savedViews', 'teams'];
+const emptyData = () => ({ ...Object.fromEntries(ENTITY_KINDS.map(k => [k, []])), ws: {}, workspaces: [], me: '', projOrder: [] });
 export const DEFAULT_PREFS = {
   theme: 'system',
   accent: 'indigo',
@@ -16,26 +18,13 @@ export const DEFAULT_PREFS = {
   motion: 'system',
   home: 'home',
   openTasks: 'drawer',
-  name: 'Tanjim Islam',
-  title: 'Head of Product',
+  name: '',
+  title: '',
 };
-export function load() {
-  try {
-    const raw = localStorage.getItem(STORE_KEY);
-    if (raw) {
-      const j = JSON.parse(raw);
-      if (j && j.data && j.data.tasks) return j;
-    }
-  } catch {
-    /* storage blocked or corrupt: start from seed data */
-  }
-  return null;
-}
-export const saved = load();
 export const S = {
-  data: saved?.data || seed(),
-  prefs: Object.assign({}, DEFAULT_PREFS, saved?.prefs || {}),
-  views: saved?.views || {},
+  data: emptyData(),
+  prefs: { ...DEFAULT_PREFS },
+  views: {},
   ui: {
     fx: {},
     auth: null,
@@ -45,7 +34,7 @@ export const S = {
     route: 'home',
     params: {},
     history: [],
-    collapsed: !!saved?.collapsed,
+    collapsed: localStorage.getItem(COLLAPSED_KEY) === '1',
     mnav: false,
     expanded: { p1: true },
     drawer: null,
@@ -82,16 +71,102 @@ export const S = {
     drafts: {},
   },
 };
+/* ---------- persistence: D1 via the Worker ---------- */
+let synced = new Map(); // "kind/id" or "@setting" -> JSON last known to the server
+let queue = Promise.resolve();
+let onRemoteChange = () => {};
+export const onRemote = fn => (onRemoteChange = fn);
+
+function snapshot() {
+  const snap = new Map();
+  for (const [k, v] of Object.entries(S.data)) {
+    if (ENTITY_KINDS.includes(k)) for (const e of v) snap.set(`${k}/${e.id}`, JSON.stringify(e));
+    else snap.set(`@${k}`, JSON.stringify(v));
+  }
+  snap.set('@prefs', JSON.stringify(S.prefs));
+  snap.set('@views', JSON.stringify(S.views));
+  return snap;
+}
+function entityOf(kind, id) {
+  return S.data[kind].find(e => e.id === id);
+}
+
+export async function hydrate() {
+  const res = await fetch('/api/state', { cache: 'no-store' });
+  if (!res.ok) throw new Error(`Could not load workspace (${res.status})`);
+  const { data, prefs, views } = await res.json();
+  S.data = Object.assign(emptyData(), data);
+  for (const k of ['activity', 'notifs']) S.data[k].sort((a, b) => (b.at || 0) - (a.at || 0));
+  S.prefs = { ...DEFAULT_PREFS, ...prefs };
+  S.views = views;
+  synced = snapshot();
+  S.ui.offline = false;
+}
+
+function push() {
+  const now = snapshot();
+  const upserts = {},
+    deletes = {},
+    settings = {};
+  for (const [k, json] of now) {
+    if (synced.get(k) === json) continue;
+    if (k[0] === '@') settings[k.slice(1)] = JSON.parse(json);
+    else {
+      const [kind, id] = k.split('/');
+      (upserts[kind] ||= []).push(entityOf(kind, id));
+    }
+  }
+  for (const k of synced.keys()) {
+    if (!now.has(k) && k[0] !== '@') {
+      const [kind, id] = k.split('/');
+      (deletes[kind] ||= []).push(id);
+    }
+  }
+  if (!Object.keys(upserts).length && !Object.keys(deletes).length && !Object.keys(settings).length) return Promise.resolve();
+  return fetch('/api/sync', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ upserts, deletes, settings }) })
+    .then(res => (res.ok ? res.json() : Promise.reject(new Error(String(res.status)))))
+    .then(({ rekeyed }) => {
+      for (const [id, key] of Object.entries(rekeyed || {})) {
+        const t = task(id);
+        if (t) t.key = key;
+      }
+      synced = snapshot();
+      if (S.ui.offline) S.ui.offline = false;
+      if (Object.keys(rekeyed || {}).length) onRemoteChange();
+    })
+    .catch(() => {
+      if (!S.ui.offline) {
+        S.ui.offline = true;
+        onRemoteChange();
+      }
+    });
+}
+
 export let _saveT;
 export function save() {
+  try {
+    localStorage.setItem(COLLAPSED_KEY, S.ui.collapsed ? '1' : '0');
+  } catch {
+    /* storage blocked: the sidebar just won't be remembered */
+  }
   clearTimeout(_saveT);
   _saveT = setTimeout(() => {
-    try {
-      localStorage.setItem(STORE_KEY, JSON.stringify({ data: S.data, prefs: S.prefs, views: S.views, collapsed: S.ui.collapsed }));
-    } catch {
-      /* storage full or blocked: keep working in memory */
-    }
+    queue = queue.then(push);
   }, 150);
+}
+
+/* Pulls changes made elsewhere (MCP, another tab) once nothing local is waiting to be pushed. */
+export async function refresh() {
+  await queue;
+  const dirty = [...snapshot()].some(([k, v]) => synced.get(k) !== v);
+  if (dirty) return;
+  try {
+    const before = JSON.stringify([...synced]);
+    await hydrate();
+    if (JSON.stringify([...synced]) !== before) onRemoteChange();
+  } catch {
+    /* stay on the data we have */
+  }
 }
 
 /* ---------- lookups ---------- */

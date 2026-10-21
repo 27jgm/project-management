@@ -5,3 +5,7 @@ dist/
 __MACOSX/
 *.log
 .env*
+!.dev.vars.example
+.wrangler/
+.dev.vars
+wrangler.jsonc

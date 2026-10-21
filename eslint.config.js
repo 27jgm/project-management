@@ -9,6 +9,10 @@ export default [
     languageOptions: { ecmaVersion: 'latest', sourceType: 'module', globals: { ...globals.browser } },
   },
   {
+    files: ['worker/**/*.js'],
+    languageOptions: { globals: { ...globals.serviceworker } },
+  },
+  {
     files: ['vite.config.js', 'eslint.config.js'],
     languageOptions: { globals: { ...globals.node } },
   },

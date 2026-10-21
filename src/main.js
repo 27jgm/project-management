@@ -6,7 +6,6 @@ import './styles/index.css';
 import './core/utils.js';
 import './core/icons.js';
 import './core/constants.js';
-import './data/seed.js';
 import './core/store.js';
 import './ui/helpers.js';
 import './core/theme.js';
@@ -54,11 +53,11 @@ import './features/archive.js';
 import './actions/teams.js';
 import './actions/subtasks.js';
 import './actions/archive.js';
-import { S, D } from './core/store.js';
+import { S, D, hydrate, onRemote, refresh } from './core/store.js';
 import { A } from './actions/actions.js';
 import { ROUTE_NAMES, render, go } from './shell/render.js';
 
-(function init() {
+(async function init() {
   document.documentElement.lang = 'en';
   if (!document.getElementById('sr-live')) {
     const l = document.createElement('div');
@@ -67,6 +66,14 @@ import { ROUTE_NAMES, render, go } from './shell/render.js';
     l.setAttribute('aria-live', 'polite');
     document.body.appendChild(l);
   }
+  try {
+    await hydrate();
+  } catch (e) {
+    document.getElementById('app').innerHTML = `<p style="padding:32px;font:14px system-ui">Couldn't load the workspace: ${e.message}</p>`;
+    return;
+  }
+  onRemote(render);
+  document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && refresh());
   const h = (location.hash || '').slice(1);
   const authRoutes = ['login', 'signup', 'forgot', 'reset', 'verify', 'onboarding'];
   if (authRoutes.includes(h)) S.ui.auth = h;

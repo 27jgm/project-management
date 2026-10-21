@@ -2,7 +2,7 @@
   "name": "gr8r-studio",
   "version": "1.0.0",
   "private": true,
-  "description": "Gr8r Studio: a calm, structured project management workspace.",
+  "description": "do: a personal project management tool on Cloudflare (Worker + D1 + MCP).",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,7 +10,11 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local",
+    "db:migrate": "wrangler d1 migrations apply DB --remote",
+    "worker:dev": "npm run build && wrangler dev",
+    "deploy": "npm run build && wrangler deploy"
   },
   "engines": {
     "node": ">=18"
@@ -21,6 +25,7 @@
     "globals": "^15.15.0",
     "lucide": "^0.460.0",
     "prettier": "^3.9.9",
-    "vite": "^6.4.4"
+    "vite": "^6.4.4",
+    "wrangler": "^4.151.3"
   }
 }
